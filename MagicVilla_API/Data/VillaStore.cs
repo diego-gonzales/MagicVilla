@@ -4,7 +4,7 @@ namespace MagicVilla_API.Data;
 
 public static class VillaStore
 {
-    public static List<VillaDTO> villaList = new List<VillaDTO>
+    public static List<VillaDTO> villaList = new()
     {
         new VillaDTO { Id = 1, Name = "Villa 1", Occupants = 10, SquareMeters = 80.5F },
         new VillaDTO { Id = 2, Name = "Villa 2", Occupants = 20, SquareMeters = 200 },
