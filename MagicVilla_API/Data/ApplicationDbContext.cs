@@ -4,13 +4,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MagicVilla_API.Data;
 
-public class VillaContext : DbContext
+public class ApplicationDbContext : DbContext
 {
     // el : base le indicamos que le vamos a pasar toda la configuración de la base de datos a la clase base DbContext.
-    public VillaContext(DbContextOptions<VillaContext> options) : base(options)
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
     public DbSet<Villa> Villas { get; set; }
+    public DbSet<VillaNumber> VillaNumbers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
