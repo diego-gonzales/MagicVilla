@@ -13,37 +13,41 @@ namespace MagicVilla_API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class VillaController : ControllerBase
+public class VillaNumberController : ControllerBase
 {
-    private readonly ILogger<VillaController> _logger; // Sirve para mostrar logs en consola
-    //private readonly VillaContext _context;
+    private readonly ILogger<VillaNumberController> _logger;
+    private readonly IVillaNumberRepository _villaNumberRepository;
     private readonly IVillaRepository _villaRepository;
     private readonly IMapper _mapper;
     protected APIResponse _response;
 
-    public VillaController(ILogger<VillaController> logger, IVillaRepository villaRepository, IMapper mapper)
+    public VillaNumberController(
+        ILogger<VillaNumberController> logger,
+        IVillaRepository villaRepository,
+        IVillaNumberRepository villaNumberRepository,
+        IMapper mapper
+    )
     {
         _logger = logger;
-        //_context = context;
         _villaRepository = villaRepository;
+        _villaNumberRepository = villaNumberRepository;
         _mapper = mapper;
         _response = new();
     }
 
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<APIResponse>> GetVillas()
+    public async Task<ActionResult<APIResponse>> GetVillaNumbers()
     {
         try
         {
-            _logger.LogInformation("Getting villas");
+            _logger.LogInformation("Getting villas number");
 
-            IEnumerable<Villa> villaList = await _villaRepository.GetAll();
+            IEnumerable<VillaNumber> villaNumberList = await _villaNumberRepository.GetAll();
 
-            _response.Result = _mapper.Map<IEnumerable<VillaDTO>>(villaList);
+            _response.Result = _mapper.Map<IEnumerable<VillaNumberDTO>>(villaNumberList);
             _response.StatusCode = HttpStatusCode.OK;
 
-            // el mapper básicamente me permite mapear de una fuente a un destino (en este caso una lista de Villa a una lista de VillaDTO)
             return Ok(_response);
         }
         catch (Exception exception)
@@ -59,29 +63,28 @@ public class VillaController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<APIResponse>> GetVilla(int id)
+    public async Task<ActionResult<APIResponse>> GetVillaNumber(int id)
     {
         try
         {
             if (id == 0)
             {
-                _logger.LogError("Error to get villa with id 0");
+                _logger.LogError("Error to get villa number with id 0");
                 _response.IsSuccessfull = false;
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 return BadRequest(_response);
             }
 
-            // var villa = VillaStore.villaList.FirstOrDefault(v => v.Id == id);
-            var villa = await _villaRepository.Get(v => v.Id == id);
+            var villaNumber = await _villaNumberRepository.Get(vn => vn.VillaNro == id);
 
-            if (villa == null)
+            if (villaNumber == null)
             {
                 _response.IsSuccessfull = false;
                 _response.StatusCode = HttpStatusCode.NotFound;
                 return NotFound(_response);
             }
 
-            _response.Result = _mapper.Map<VillaDTO>(villa);
+            _response.Result = _mapper.Map<VillaNumberDTO>(villaNumber);
             _response.StatusCode = HttpStatusCode.OK;
 
             return Ok(_response);
@@ -99,34 +102,35 @@ public class VillaController : ControllerBase
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]
-    public async Task<ActionResult<APIResponse>> CreateVilla([FromBody] VillaCreateDTO villaCreateDTO)
+    public async Task<ActionResult<APIResponse>> CreateVillaNumber([FromBody] VillaNumberCreateDTO villaNumberCreateDTO)
     {
         try
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest();
-            }
+            if (!ModelState.IsValid) return BadRequest();
 
-            if (await _villaRepository.Get(v => v.Name!.ToLower() == villaCreateDTO.Name!.ToLower()) != null)
+            if (await _villaNumberRepository.Get(vn => vn.VillaNro == villaNumberCreateDTO.VillaNro) != null)
             {
-                ModelState.AddModelError("NameExists", $"Villa with the {villaCreateDTO.Name} name already exists");
+                ModelState.AddModelError("NameExists", $"Villa with the {villaNumberCreateDTO.VillaNro} number already exists");
                 return BadRequest(ModelState);
             }
 
-            if (villaCreateDTO == null) return BadRequest(villaCreateDTO);
+            if (await _villaRepository.Get(v => v.Id == villaNumberCreateDTO.VillaId) == null)
+            {
+                ModelState.AddModelError("VillaId", $"Villa with the {villaNumberCreateDTO.VillaId} id does not exists");
+                return BadRequest(ModelState);
+            }
 
-            Villa newVilla = _mapper.Map<Villa>(villaCreateDTO);
-            newVilla.CreationDate = DateTime.Now;
-            newVilla.UpdateDate = DateTime.Now;
+            if (villaNumberCreateDTO == null) return BadRequest(villaNumberCreateDTO);
 
-            await _villaRepository.Create(newVilla);
-            //await _villaRepository.Save(); // Esto ya no es necesario porque el método Create ya hace el Save
-            _response.Result = newVilla;
+            VillaNumber newVillaNumber = _mapper.Map<VillaNumber>(villaNumberCreateDTO);
+            newVillaNumber.CreationDate = DateTime.Now;
+            newVillaNumber.UpdateDate = DateTime.Now;
+
+            await _villaNumberRepository.Create(newVillaNumber);
+            _response.Result = newVillaNumber;
             _response.StatusCode = HttpStatusCode.Created;
 
-            // el 3 parámetro lo puedo enviar según el DTO, para no mostrar datos innecesarios (usar método villaToVillaDTO() que creé más abajo, o usar _mapper.Map<VillaDTO(newVilla)>)
-            return CreatedAtAction(nameof(GetVilla), new { id = newVilla.Id }, _response);
+            return CreatedAtAction(nameof(GetVillaNumber), new { id = newVillaNumber.VillaNro }, _response);
         }
         catch (Exception exception)
         {
@@ -141,7 +145,7 @@ public class VillaController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> DeleteVilla(int id)
+    public async Task<IActionResult> DeleteVillaNumber(int id)
     {
         try
         {
@@ -152,20 +156,18 @@ public class VillaController : ControllerBase
                 return BadRequest(_response);
             }
 
-            var villa = await _villaRepository.Get(x => x.Id == id);
+            var villaNumber = await _villaNumberRepository.Get(vn => vn.VillaNro == id);
 
-            if (villa == null)
+            if (villaNumber == null)
             {
                 _response.IsSuccessfull = false;
                 _response.StatusCode = HttpStatusCode.NotFound;
                 return NotFound(_response);
             }
 
-            await _villaRepository.Remove(villa);
-            //await _villaRepository.Save(); // Esto ya no es necesario porque el método Remove ya hace el Save
+            await _villaNumberRepository.Remove(villaNumber);
             _response.StatusCode = HttpStatusCode.NoContent;
 
-            //return NoContent();
             return Ok(_response);
         }
         catch (Exception exception)
@@ -181,29 +183,35 @@ public class VillaController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> UpdateVilla(int id, [FromBody] VillaUpdateDTO villaUpdateDTO)
+    public async Task<IActionResult> UpdateVillaNumber(int id, [FromBody] VillaNumberUpdateDTO villaNumberUpdateDTO)
     {
-        if (villaUpdateDTO == null || id != villaUpdateDTO.Id)
+        if (villaNumberUpdateDTO == null || id != villaNumberUpdateDTO.VillaNro)
         {
             _response.IsSuccessfull = false;
             _response.StatusCode = HttpStatusCode.BadRequest;
             return BadRequest(_response);
         }
 
-        Villa updatedVilla = _mapper.Map<Villa>(villaUpdateDTO);
+        if (await _villaRepository.Get(v => v.Id == villaNumberUpdateDTO.VillaId) == null)
+        {
+            ModelState.AddModelError("VillaId", $"Villa with the {villaNumberUpdateDTO.VillaId} id does not exists");
+            return BadRequest(ModelState);
+        }
 
-        await _villaRepository.Update(updatedVilla);
-        //await _villaRepository.Save(); // Esto ya no es necesario porque el método Update ya hace el Save
+        VillaNumber updatedVillaNumber = _mapper.Map<VillaNumber>(villaNumberUpdateDTO);
+
+        await _villaNumberRepository.Update(updatedVillaNumber);
         _response.StatusCode = HttpStatusCode.NoContent;
 
         return Ok(_response);
     }
 
+    /*
     [HttpPatch("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> PatchVilla(int id, JsonPatchDocument<VillaUpdateDTO> patchDTO)
+    public async Task<IActionResult> PatchVillaNumber(int id, JsonPatchDocument<VillaNumberUpdateDTO> patchDTO)
     {
         if (patchDTO == null || id == 0)
         {
@@ -212,48 +220,26 @@ public class VillaController : ControllerBase
             return BadRequest(_response);
         }
 
-        var villa = await _villaRepository.Get(v => v.Id == id, false); // Se usa asNoTracking() method para que no se haga un seguimiento de los cambios en la entidad
+        var villaNumber = await _villaNumberRepository.Get(vn => vn.VillaNro == id, false);
 
-        if (villa == null)
+        if (villaNumber == null)
         {
             _response.IsSuccessfull = false;
             _response.StatusCode = HttpStatusCode.NotFound;
             return NotFound(_response);
         }
 
-        VillaUpdateDTO villaDTO = _mapper.Map<VillaUpdateDTO>(villa);
+        VillaNumberUpdateDTO villaNumberDTO = _mapper.Map<VillaNumberUpdateDTO>(villaNumber);
 
-        patchDTO.ApplyTo(villaDTO, ModelState);
+        patchDTO.ApplyTo(villaNumberDTO, ModelState);
 
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        Villa updatedVilla = _mapper.Map<Villa>(villaDTO);
+        VillaNumber updatedVillaNumber = _mapper.Map<VillaNumber>(villaNumberDTO);
 
-        await _villaRepository.Update(updatedVilla);
-        //await _villaRepository.Save(); // Esto ya no es necesario porque el método Update ya hace el Save
+        await _villaNumberRepository.Update(updatedVillaNumber);
         _response.StatusCode = HttpStatusCode.NoContent;
 
         return Ok(_response);
-    }
-
-    /*
-    private static VillaDTO villaToVillaDTO(Villa villa) =>
-       new()
-       {
-           Id = villa.Id,
-           Name = villa.Name,
-           Detail = villa.Detail,
-           Fee = villa.Fee,
-           ImageUrl = villa.ImageUrl,
-           Amenity = villa.Amenity,
-           Occupants = villa.Occupants,
-           SquareMeters = villa.SquareMeters
-       }; */
+    } */
 }
-
-
-// IEnumerable es para cuando devolvemos una lista.
-// ActionResult<T> me va a permitir devolver múltiples status codes dentro de mi método, además que me permite devolver lo que coloque como genérico.
-// IActionResult hace lo mismo que el anterior pero como no devuelve nada ya que no acepta genéricos, se usa mayormente para el DELETE y PUT (devuelvo un NoContent()).
-
-// Curso visto en: https://www.youtube.com/watch?v=OuiExAqVapk&t=14763s
